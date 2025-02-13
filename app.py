@@ -35,11 +35,11 @@ def init_db():
         )
     ''')
 
-    # Check if flag file exists to determine if this is a fresh start
+    
     if not os.path.exists(FLAG_FILE):
-        cursor.execute("DELETE FROM chat_history")  # Clear history only once
+        cursor.execute("DELETE FROM chat_history")
         with open(FLAG_FILE, "w") as f:
-            f.write("initialized")  # Create the flag file to mark the first run
+            f.write("initialized")  
 
     conn.commit()
     conn.close()
@@ -90,7 +90,6 @@ prompt_template = ChatPromptTemplate.from_messages(
     ]
 )
 
-# Function to store chat in the database
 def save_chat(user_query, bot_response):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -98,7 +97,6 @@ def save_chat(user_query, bot_response):
     conn.commit()
     conn.close()
 
-# Function to fetch previous chats
 def get_chat_history():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -107,24 +105,7 @@ def get_chat_history():
     conn.close()
     return history
     
-# Streamlit UI
 
-# st.title("📖 What can I help with?")
-# query = st.chat_input("Message: ") 
-
-# if query:
-#     with st.spinner("Thinking..."):
-#         try:
-#             question_answer_chain = create_stuff_documents_chain(llm, prompt_template)
-#             rag_chain = create_retrieval_chain(retriever, question_answer_chain)
-#             response = rag_chain.invoke({"input": query})
-
-#             st.write(response.get("answer", "Sorry, I don't know the answer."))
-#         except Exception as e:
-#             st.error(f"An error occurred: {e}")
-
-
-# st.title("📖 What can I help with?")
 st.title("WELCOME TO COBSAi")
 query = st.chat_input("Enter prompt message here... ")
 
@@ -136,21 +117,18 @@ if query:
             response = rag_chain.invoke({"input": query})
             bot_response = response.get("answer", "Sorry, I don't know the answer.")
             
-            # Store chat in database
             save_chat(query, bot_response)
             
-            # st.write(bot_response)
         except Exception as e:
             st.error(f"An error occurred: {e}")
 
-# Display previous chats
-# st.subheader("📜 Recent Chat History")
+
 chat_history = get_chat_history()
 for user_query, bot_response, timestamp in chat_history:
     # st.write(f"🕒 {timestamp}")
     st.write(f"**You:** {user_query}")
     st.write(f"**Bot:** {bot_response}")
-    # st.write("---")
+
 
 
 
