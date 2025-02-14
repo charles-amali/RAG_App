@@ -16,10 +16,11 @@ Get started by exploring the Streamlit application [here](https://graham-bot-419
 To install the required dependencies, follow these steps: 
 1. Clone the repository (if you haven’t already):  
    ```bash
-   git clone <repository-url>
+   git clone (https://github.com/charles-amali/RAG_App.git)
    cd RAG_App
    ```
 2. Create and activate a virtual environment:
+   
    On Windows
    ```bash
    python -m venv venv  
@@ -30,7 +31,7 @@ To install the required dependencies, follow these steps:
    python -m venv venv  
    source venv/bin/activate
    ```
-3. Install dependencies, run:
+4. Install dependencies, run:
 ```bash
 pip install -r requirements.txt
 ```
