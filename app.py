@@ -1,6 +1,5 @@
 import os
 import streamlit as st
-import sqlite3
 from dotenv import load_dotenv
 from langchain_community.document_loaders import TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -12,43 +11,22 @@ from langchain_core.prompts import ChatPromptTemplate
 
 load_dotenv()
 
-st.set_page_config(page_title="RAG Chatbot", page_icon="🤖")
+st.set_page_config(page_title="RAG Chatbot", page_icon=":brain:", layout="centered")
 
 
 FILE_PATH = "paul_graham_essay.txt"
-CHUNK_SIZE = 500
-CHUNK_OVERLAP = 50
+CHUNK_SIZE = 1000
+CHUNK_OVERLAP = 200
 EMBEDDING_MODEL = "models/embedding-001"
 LLM_MODEL = "gemini-1.5-pro"
-FLAG_FILE = "app_initialized.flag"
-DB_FILE = "chat_history.db"
 
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS chat_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_query TEXT,
-            bot_response TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+API_KEY = os.getenv("GOOGLE_API_KEY")
+if not API_KEY:
+    st.error("Missing API Key! Please set GOOGLE_API_KEY in the .env file.")
 
-    
-    if not os.path.exists(FLAG_FILE):
-        cursor.execute("DELETE FROM chat_history")
-        with open(FLAG_FILE, "w") as f:
-            f.write("initialized")  
+if "messages" not in st.session_state:
+    st.session_state["messages"] = []
 
-    conn.commit()
-    conn.close()
-
-# if "app_started" not in st.session_state:
-#     init_db()
-#     st.session_state["app_started"] = True  
-
-init_db()
 
 @st.cache_data
 def load_and_split_text(file_path):
@@ -61,14 +39,14 @@ def load_and_split_text(file_path):
 texts = load_and_split_text(FILE_PATH)    
 
 def create_vector_store(texts):
-    embeddings = GoogleGenerativeAIEmbeddings(model=EMBEDDING_MODEL)
+    embeddings = GoogleGenerativeAIEmbeddings(model=EMBEDDING_MODEL, google_api_key=API_KEY)
     vector_store = FAISS.from_documents(texts, embeddings)
     return vector_store
 
 vector_store = create_vector_store(texts)
 retriever = vector_store.as_retriever(search_type = 'similarity', search_kwargs={"k":10})
 
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0.1, max_tokens=150, timeout=None)
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", google_api_key=API_KEY, temperature=0, max_tokens=500, request_options={"timeout":5000})
 
 
 SYSTEM_PROMPT = (
@@ -90,44 +68,36 @@ prompt_template = ChatPromptTemplate.from_messages(
     ]
 )
 
-def save_chat(user_query, bot_response):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO chat_history (user_query, bot_response) VALUES (?, ?)", (user_query, bot_response))
-    conn.commit()
-    conn.close()
+st.markdown("<h1 style='text-align: center;'>Welcome To GrahamBot</h1>", unsafe_allow_html=True)
 
-def get_chat_history():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_query, bot_response, timestamp FROM chat_history ORDER BY timestamp ASC LIMIT 5")
-    history = cursor.fetchall()
-    conn.close()
-    return history
-    
-
-st.title("WELCOME TO COBSAi")
 query = st.chat_input("Enter prompt message here... ")
 
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+
 if query:
+    st.session_state.messages.append({"role": "user", "content": query})
+
+    with st.chat_message("user"):
+        st.markdown(query)
+
     with st.spinner("Thinking..."):
         try:
             question_answer_chain = create_stuff_documents_chain(llm, prompt_template)
             rag_chain = create_retrieval_chain(retriever, question_answer_chain)
             response = rag_chain.invoke({"input": query})
-            bot_response = response.get("answer", "Sorry, I don't know the answer.")
+            bot_response = response.get("answer", "Sorry, I don't know the answer to that question.")
+            st.session_state.messages.append({"role": "assistant", "content": bot_response})
             
-            save_chat(query, bot_response)
-            
+            with st.chat_message("assistant"):
+                st.markdown(bot_response)
         except Exception as e:
             st.error(f"An error occurred: {e}")
+            st.session_state.messages.append({"role": "assistant", "content": "Sorry, there was an error. Please try again."})
 
 
-chat_history = get_chat_history()
-for user_query, bot_response, timestamp in chat_history:
-    # st.write(f"🕒 {timestamp}")
-    st.write(f"**You:** {user_query}")
-    st.write(f"**Bot:** {bot_response}")
 
 
 
